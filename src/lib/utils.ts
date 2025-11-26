@@ -85,6 +85,11 @@ export async function extractKeyFrames(
   video: HTMLVideoElement,
   duration: number
 ): Promise<string[]> {
+  // Validate duration
+  if (!duration || isNaN(duration) || duration === Infinity || duration <= 0) {
+    throw new Error(`Invalid video duration: ${duration}`);
+  }
+
   // Reduced to 4 key frames for faster analysis
   const keyPositions = [
     { name: "address", timePercent: 0.05 },
@@ -95,7 +100,8 @@ export async function extractKeyFrames(
 
   const frames: string[] = [];
   for (const pos of keyPositions) {
-    const time = duration * pos.timePercent;
+    const time = Math.max(0, Math.min(duration * pos.timePercent, duration - 0.1));
+    console.log(`Extracting ${pos.name} frame at ${time.toFixed(2)}s`);
     const frame = await extractVideoFrameAsBase64(video, time, 512);
     frames.push(frame);
   }

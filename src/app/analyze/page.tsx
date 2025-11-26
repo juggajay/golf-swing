@@ -65,10 +65,40 @@ export default function AnalyzePage() {
       const video = document.createElement("video");
       video.src = videoUrl;
       video.crossOrigin = "anonymous";
+      video.preload = "metadata";
 
-      await new Promise((resolve, reject) => {
-        video.onloadedmetadata = resolve;
-        video.onerror = reject;
+      // Wait for video metadata and duration to be available
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Video load timeout"));
+        }, 30000);
+
+        const checkDuration = () => {
+          if (video.duration && !isNaN(video.duration) && video.duration !== Infinity) {
+            clearTimeout(timeoutId);
+            resolve();
+          }
+        };
+
+        video.onloadedmetadata = () => {
+          checkDuration();
+        };
+
+        video.ondurationchange = () => {
+          checkDuration();
+        };
+
+        video.oncanplaythrough = () => {
+          checkDuration();
+        };
+
+        video.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error("Failed to load video"));
+        };
+
+        // For blob URLs, we may need to trigger load
+        video.load();
       });
 
       setProgress({
@@ -76,6 +106,8 @@ export default function AnalyzePage() {
         progress: 25,
         message: "Video loaded successfully",
       });
+
+      console.log("Video duration:", video.duration);
 
       // Stage 2: Extracting key frames
       setProgress({
