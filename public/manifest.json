@@ -1,0 +1,42 @@
+{
+  "name": "SwingAI - Golf Swing Analyzer",
+  "short_name": "SwingAI",
+  "description": "AI-powered golf swing analysis for golfers of all levels",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "health", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Analyze Swing",
+      "url": "/analyze",
+      "description": "Upload or record a new swing"
+    },
+    {
+      "name": "View Drills",
+      "url": "/drills",
+      "description": "Browse practice drills"
+    },
+    {
+      "name": "History",
+      "url": "/history",
+      "description": "View your swing history"
+    }
+  ]
+}
