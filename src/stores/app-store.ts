@@ -35,6 +35,8 @@ interface AppState {
   // UI state
   isAnalyzing: boolean;
   setIsAnalyzing: (value: boolean) => void;
+  isFullscreenRecorderOpen: boolean;
+  setIsFullscreenRecorderOpen: (value: boolean) => void;
 
   // Comparison mode
   comparisonSwings: [Swing | null, Swing | null];
@@ -99,6 +101,8 @@ export const useAppStore = create<AppState>()(
       // UI state
       isAnalyzing: false,
       setIsAnalyzing: (value) => set({ isAnalyzing: value }),
+      isFullscreenRecorderOpen: false,
+      setIsFullscreenRecorderOpen: (value) => set({ isFullscreenRecorderOpen: value }),
 
       // Comparison
       comparisonSwings: [null, null],

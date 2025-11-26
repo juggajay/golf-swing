@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { FullscreenRecorder } from "./fullscreen-recorder";
+import { useAppStore } from "@/stores/app-store";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File | string) => void;
@@ -32,6 +33,7 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
   const [showFullscreenRecorder, setShowFullscreenRecorder] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const setIsFullscreenRecorderOpen = useAppStore((state) => state.setIsFullscreenRecorderOpen);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,11 +84,18 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
 
   const handleRecordClick = () => {
     setShowFullscreenRecorder(true);
+    setIsFullscreenRecorderOpen(true);
   };
 
   const handleVideoRecorded = (file: File) => {
     setShowFullscreenRecorder(false);
+    setIsFullscreenRecorderOpen(false);
     onVideoSelect(file);
+  };
+
+  const handleRecorderClose = () => {
+    setShowFullscreenRecorder(false);
+    setIsFullscreenRecorderOpen(false);
   };
 
   const handleSubmit = () => {
@@ -351,7 +360,7 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
         {showFullscreenRecorder && (
           <FullscreenRecorder
             onVideoRecorded={handleVideoRecorded}
-            onClose={() => setShowFullscreenRecorder(false)}
+            onClose={handleRecorderClose}
           />
         )}
       </AnimatePresence>
