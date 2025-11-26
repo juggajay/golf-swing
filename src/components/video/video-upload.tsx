@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { FullscreenRecorder } from "./fullscreen-recorder";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File | string) => void;
@@ -28,13 +29,9 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [showFullscreenRecorder, setShowFullscreenRecorder] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -83,63 +80,18 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 1280, height: 720 },
-        audio: false,
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm",
-      });
-
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        setRecordedBlob(blob);
-        stream.getTracks().forEach((track) => track.stop());
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-          videoRef.current.src = URL.createObjectURL(blob);
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      setError("Could not access camera. Please check permissions.");
-    }
+  const handleRecordClick = () => {
+    setShowFullscreenRecorder(true);
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
+  const handleVideoRecorded = (file: File) => {
+    setShowFullscreenRecorder(false);
+    onVideoSelect(file);
   };
 
   const handleSubmit = () => {
     if (method === "upload" && selectedFile) {
       onVideoSelect(selectedFile);
-    } else if (method === "record" && recordedBlob) {
-      const file = new File([recordedBlob], "recorded-swing.webm", {
-        type: "video/webm",
-      });
-      onVideoSelect(file);
     } else if (method === "url" && videoUrl) {
       onVideoSelect(videoUrl);
     }
@@ -147,14 +99,9 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
 
   const resetSelection = () => {
     setSelectedFile(null);
-    setRecordedBlob(null);
     setVideoUrl("");
     setError(null);
     setMethod(null);
-    if (videoRef.current) {
-      videoRef.current.src = "";
-      videoRef.current.srcObject = null;
-    }
   };
 
   return (
@@ -185,7 +132,7 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
 
           <Card
             className="p-6 cursor-pointer hover:border-primary hover:shadow-lg hover:shadow-primary/10 transition-all duration-200"
-            onClick={() => setMethod("record")}
+            onClick={handleRecordClick}
           >
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/25">
@@ -271,71 +218,6 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
             <Button
               variant="ghost"
               className="mt-4"
-              onClick={resetSelection}
-            >
-              ← Back to options
-            </Button>
-          </motion.div>
-        )}
-
-        {/* Recording Area */}
-        {method === "record" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-4"
-          >
-            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden">
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                playsInline
-                muted={isRecording}
-                controls={!isRecording && !!recordedBlob}
-              />
-
-              {isRecording && (
-                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-red-500 rounded-full">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                  <span className="text-white text-sm font-medium">REC</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-center gap-4">
-              {!isRecording && !recordedBlob && (
-                <Button size="lg" onClick={startRecording}>
-                  <Camera className="w-5 h-5 mr-2" />
-                  Start Recording
-                </Button>
-              )}
-
-              {isRecording && (
-                <Button size="lg" variant="destructive" onClick={stopRecording}>
-                  Stop Recording
-                </Button>
-              )}
-
-              {recordedBlob && (
-                <>
-                  <Button variant="outline" onClick={() => {
-                    setRecordedBlob(null);
-                    startRecording();
-                  }}>
-                    Re-record
-                  </Button>
-                  <Button size="lg" onClick={handleSubmit} disabled={isUploading}>
-                    <Check className="w-5 h-5 mr-2" />
-                    Use This Video
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <Button
-              variant="ghost"
-              className="w-full"
               onClick={resetSelection}
             >
               ← Back to options
@@ -463,6 +345,16 @@ export function VideoUpload({ onVideoSelect, isUploading }: VideoUploadProps) {
           <li>• Record a single swing (5-15 seconds ideal)</li>
         </ul>
       </div>
+
+      {/* Fullscreen Recorder */}
+      <AnimatePresence>
+        {showFullscreenRecorder && (
+          <FullscreenRecorder
+            onVideoRecorded={handleVideoRecorded}
+            onClose={() => setShowFullscreenRecorder(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

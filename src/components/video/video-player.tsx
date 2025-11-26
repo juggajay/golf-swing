@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn, formatDuration } from "@/lib/utils";
+import { PoseOverlay } from "./pose-overlay";
 import type { VideoState, OverlaySettings } from "@/types";
 
 interface VideoPlayerProps {
@@ -31,14 +32,25 @@ interface VideoPlayerProps {
   onTimeUpdate?: (time: number) => void;
   onFrameCapture?: (imageData: string, time: number) => void;
   keyFrames?: { name: string; time: number }[];
+  showPoseOverlay?: boolean;
 }
+
+const DEFAULT_OVERLAY_SETTINGS: OverlaySettings = {
+  swingPlane: true,
+  spine: true,
+  clubPath: false,
+  hipLine: false,
+  shoulderLine: false,
+  targetLine: true,
+};
 
 export function VideoPlayer({
   src,
-  overlaySettings,
+  overlaySettings: initialOverlaySettings,
   onTimeUpdate,
   onFrameCapture,
   keyFrames = [],
+  showPoseOverlay = false,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,6 +67,9 @@ export function VideoPlayer({
 
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [overlaySettings, setOverlaySettings] = useState<OverlaySettings>(
+    initialOverlaySettings || DEFAULT_OVERLAY_SETTINGS
+  );
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle video metadata loaded
@@ -270,11 +285,13 @@ export function VideoPlayer({
       {/* Canvas for frame capture (hidden) */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Overlay Canvas for drawing lines */}
-      {overlaySettings && (
-        <canvas
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          id="overlay-canvas"
+      {/* Pose Overlay for drawing lines */}
+      {showPoseOverlay && (
+        <PoseOverlay
+          videoRef={videoRef}
+          containerRef={containerRef}
+          settings={overlaySettings}
+          onSettingsChange={setOverlaySettings}
         />
       )}
 

@@ -339,6 +339,7 @@ export default function AnalyzePage() {
                     { name: "follow_through", time: 1.8 },
                     { name: "finish", time: 2.2 },
                   ]}
+                  showPoseOverlay={true}
                 />
               </div>
 
