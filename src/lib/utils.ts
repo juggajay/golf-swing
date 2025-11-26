@@ -42,12 +42,16 @@ export function getSeverityColor(severity: string): string {
 
 export function extractVideoFrameAsBase64(
   video: HTMLVideoElement,
-  time: number
+  time: number,
+  maxWidth: number = 512
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+
+    // Scale down to max 512px width for faster processing
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -58,7 +62,7 @@ export function extractVideoFrameAsBase64(
     video.currentTime = time;
     video.onseeked = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
       resolve(dataUrl);
     };
     video.onerror = () => reject(new Error("Video seek failed"));
@@ -69,20 +73,18 @@ export async function extractKeyFrames(
   video: HTMLVideoElement,
   duration: number
 ): Promise<string[]> {
+  // Reduced to 4 key frames for faster analysis
   const keyPositions = [
     { name: "address", timePercent: 0.05 },
-    { name: "takeaway", timePercent: 0.15 },
     { name: "top", timePercent: 0.35 },
-    { name: "transition", timePercent: 0.45 },
-    { name: "impact", timePercent: 0.6 },
-    { name: "follow_through", timePercent: 0.75 },
-    { name: "finish", timePercent: 0.95 },
+    { name: "impact", timePercent: 0.55 },
+    { name: "finish", timePercent: 0.9 },
   ];
 
   const frames: string[] = [];
   for (const pos of keyPositions) {
     const time = duration * pos.timePercent;
-    const frame = await extractVideoFrameAsBase64(video, time);
+    const frame = await extractVideoFrameAsBase64(video, time, 512);
     frames.push(frame);
   }
   return frames;

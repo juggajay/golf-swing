@@ -228,12 +228,12 @@ export async function analyzeSwingFrames(
     type: "image_url" as const,
     image_url: {
       url: frame.startsWith("data:") ? frame : `data:image/jpeg;base64,${frame}`,
-      detail: "high" as const,
+      detail: "low" as const, // Use low detail for faster processing
     },
   }));
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4o-mini", // Faster model, still great at vision tasks
     messages: [
       {
         role: "system",
@@ -244,22 +244,20 @@ export async function analyzeSwingFrames(
         content: [
           {
             type: "text",
-            text: `Analyze this golf swing sequence. The images show key positions throughout the swing.
+            text: `Analyze this golf swing sequence. The images show key positions: Address, Top of Backswing, Impact, and Finish.
 
 Camera angle: ${cameraAngle}
 Club used: ${clubUsed}
 
-The frames are in order: Address, Takeaway, Top of Backswing, Transition, Impact, Follow-through, Finish.
-
-Please provide a comprehensive analysis in the specified JSON format.`,
+Provide a comprehensive analysis in JSON format.`,
           },
           ...imageContent,
         ],
       },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 4000,
-    temperature: 0.7,
+    max_tokens: 2500,
+    temperature: 0.5,
   });
 
   const content = response.choices[0]?.message?.content;

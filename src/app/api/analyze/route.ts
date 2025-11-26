@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeSwingFrames, detectCameraAngle } from "@/lib/openai";
+import { analyzeSwingFrames } from "@/lib/openai";
 
 export const maxDuration = 60; // Maximum 60 seconds for analysis
 
@@ -15,28 +15,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Detect camera angle if not provided
-    let detectedAngle = cameraAngle;
-    if (!cameraAngle || cameraAngle === "unknown") {
-      try {
-        detectedAngle = await detectCameraAngle(frames[0]);
-      } catch (e) {
-        console.error("Failed to detect camera angle:", e);
-        detectedAngle = "unknown";
-      }
-    }
+    console.log(`Analyzing ${frames.length} frames...`);
 
-    // Analyze the swing
+    // Analyze the swing (skip camera angle detection to save time)
     const analysis = await analyzeSwingFrames(
       frames,
-      detectedAngle,
+      cameraAngle || "unknown",
       clubUsed || "unknown"
     );
+
+    console.log("Analysis complete!");
 
     return NextResponse.json({
       success: true,
       analysis,
-      cameraAngle: detectedAngle,
+      cameraAngle: cameraAngle || "unknown",
     });
   } catch (error: any) {
     console.error("Analysis error:", error);
