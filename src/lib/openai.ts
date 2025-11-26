@@ -233,7 +233,7 @@ export async function analyzeSwingFrames(
   }));
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini", // Faster model, still great at vision tasks
+    model: "gpt-4o", // Best vision model for detailed analysis
     messages: [
       {
         role: "system",

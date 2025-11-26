@@ -59,13 +59,25 @@ export function extractVideoFrameAsBase64(
       return;
     }
 
-    video.currentTime = time;
-    video.onseeked = () => {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-      resolve(dataUrl);
+    // Set up timeout for slow seeks
+    const timeout = setTimeout(() => {
+      reject(new Error(`Video seek timeout at ${time}s`));
+    }, 10000);
+
+    const handleSeeked = () => {
+      clearTimeout(timeout);
+      video.removeEventListener("seeked", handleSeeked);
+
+      // Small delay to ensure frame is rendered
+      setTimeout(() => {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        resolve(dataUrl);
+      }, 100);
     };
-    video.onerror = () => reject(new Error("Video seek failed"));
+
+    video.addEventListener("seeked", handleSeeked);
+    video.currentTime = time;
   });
 }
 

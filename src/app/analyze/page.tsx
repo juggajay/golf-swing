@@ -96,8 +96,10 @@ export default function AnalyzePage() {
       setProgress({
         stage: "analyzing",
         progress: 60,
-        message: "AI is analyzing your swing...",
+        message: "AI is analyzing your swing (this may take 20-30 seconds)...",
       });
+
+      console.log(`Sending ${frames.length} frames for analysis...`);
 
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -118,8 +120,9 @@ export default function AnalyzePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Analysis failed");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API error:", errorData);
+        throw new Error(errorData.error || `Analysis failed (status ${response.status})`);
       }
 
       const result = await response.json();

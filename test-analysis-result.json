@@ -1,0 +1,101 @@
+{
+  "overall_rating": "6/10",
+  "handicap_estimate": "18-22",
+  "swing_type": "Modern",
+  "primary_ball_flight": "Slight Fade",
+  "analysis": {
+    "setup": {
+      "score": 7,
+      "strengths": [
+        "Balanced stance",
+        "Good alignment"
+      ],
+      "improvements": [
+        {
+          "issue": "Grip pressure appears tight",
+          "severity": "moderate",
+          "drill": "Practice with lighter grip pressure to promote fluidity",
+          "impact": "Improves swing speed and control"
+        }
+      ]
+    },
+    "backswing": {
+      "score": 6,
+      "strengths": [
+        "Full shoulder turn"
+      ],
+      "improvements": [
+        {
+          "issue": "Slight over-rotation of hips",
+          "severity": "moderate",
+          "drill": "Use alignment sticks to restrict hip turn",
+          "impact": "Improves consistency and power"
+        }
+      ]
+    },
+    "transition": {
+      "score": 5,
+      "strengths": [
+        "Smooth tempo"
+      ],
+      "improvements": [
+        {
+          "issue": "Early release of wrists",
+          "severity": "major",
+          "drill": "Lag drills with towel under arms",
+          "impact": "Increases lag and distance"
+        }
+      ]
+    },
+    "impact": {
+      "score": 6,
+      "strengths": [
+        "Solid contact"
+      ],
+      "improvements": [
+        {
+          "issue": "Slightly open clubface",
+          "severity": "moderate",
+          "drill": "Impact bag drills focusing on square face",
+          "impact": "Reduces fade and increases accuracy"
+        }
+      ]
+    },
+    "follow_through": {
+      "score": 6,
+      "strengths": [
+        "Balanced finish"
+      ],
+      "improvements": [
+        {
+          "issue": "Limited hip rotation",
+          "severity": "minor",
+          "drill": "Full swing rotations focusing on hip movement",
+          "impact": "Enhances power and follow-through"
+        }
+      ]
+    }
+  },
+  "priority_fixes": [
+    {
+      "rank": 1,
+      "issue": "Early release of wrists",
+      "explanation": "Releasing the wrists too early reduces power and control.",
+      "drills": [
+        "Lag drills with towel under arms"
+      ],
+      "expected_improvement": "Better distance and control"
+    }
+  ],
+  "practice_plan": {
+    "range_session": [
+      "Lag drills with towel under arms",
+      "Impact bag drills",
+      "Alignment stick drills for backswing"
+    ],
+    "at_home_drills": [
+      "Grip pressure exercises",
+      "Hip rotation exercises without club"
+    ]
+  }
+}
