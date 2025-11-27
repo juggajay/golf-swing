@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Share, Download } from "lucide-react";
+import { ArrowLeft, Share, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { VideoUpload } from "@/components/video/video-upload";
 import { VideoPlayer } from "@/components/video/video-player";
 import { AnalysisProgress } from "@/components/analysis/analysis-progress";
 import { AnalysisResults } from "@/components/analysis/analysis-results";
+import { AutoCaptureCamera } from "@/components/video/auto-capture-camera";
 import { useAppStore } from "@/stores/app-store";
 import { extractKeyFrames, generateId } from "@/lib/utils";
 import type { AnalysisProgress as AnalysisProgressType, SwingAnalysis, Swing } from "@/types";
@@ -20,10 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Stage = "upload" | "options" | "analyzing" | "results";
+type Stage = "camera" | "upload" | "options" | "analyzing" | "results";
 
 export default function AnalyzePage() {
-  const [stage, setStage] = useState<Stage>("upload");
+  const [stage, setStage] = useState<Stage>("camera"); // Start with camera
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [cameraAngle, setCameraAngle] = useState<string>("unknown");
@@ -37,7 +38,15 @@ export default function AnalyzePage() {
   const [error, setError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { addSwing, setCurrentSwing } = useAppStore();
+  const { addSwing, setCurrentSwing, setIsFullscreenRecorderOpen } = useAppStore();
+
+  // Auto-open camera on mount
+  useEffect(() => {
+    setIsFullscreenRecorderOpen(true);
+    return () => {
+      setIsFullscreenRecorderOpen(false);
+    };
+  }, [setIsFullscreenRecorderOpen]);
 
   const handleVideoSelect = useCallback((fileOrUrl: File | string) => {
     if (typeof fileOrUrl === "string") {
@@ -46,8 +55,21 @@ export default function AnalyzePage() {
       setVideoFile(fileOrUrl);
       setVideoUrl(URL.createObjectURL(fileOrUrl));
     }
+    setIsFullscreenRecorderOpen(false);
     setStage("options");
-  }, []);
+  }, [setIsFullscreenRecorderOpen]);
+
+  const handleAutoCaptureVideo = useCallback((file: File) => {
+    setVideoFile(file);
+    setVideoUrl(URL.createObjectURL(file));
+    setIsFullscreenRecorderOpen(false);
+    setStage("options");
+  }, [setIsFullscreenRecorderOpen]);
+
+  const handleCameraClose = useCallback(() => {
+    setIsFullscreenRecorderOpen(false);
+    setStage("upload");
+  }, [setIsFullscreenRecorderOpen]);
 
   const startAnalysis = async () => {
     setStage("analyzing");
@@ -193,7 +215,8 @@ export default function AnalyzePage() {
   };
 
   const resetAnalysis = () => {
-    setStage("upload");
+    setStage("camera");
+    setIsFullscreenRecorderOpen(true);
     setVideoFile(null);
     setVideoUrl("");
     setCameraAngle("unknown");
@@ -204,54 +227,81 @@ export default function AnalyzePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <div className="sticky top-14 md:top-0 z-30 bg-background/95 backdrop-blur-lg border-b">
-        <div className="flex items-center justify-between h-14 px-4 max-w-6xl mx-auto">
-          <div className="flex items-center gap-4">
-            {stage !== "upload" && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={stage === "results" ? resetAnalysis : () => setStage("upload")}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            )}
-            <h1 className="font-bold text-lg">
-              {stage === "upload" && "Analyze Swing"}
-              {stage === "options" && "Swing Options"}
-              {stage === "analyzing" && "Analyzing..."}
-              {stage === "results" && "Analysis Results"}
-            </h1>
-          </div>
+      {/* Auto Capture Camera - Fullscreen */}
+      <AnimatePresence>
+        {stage === "camera" && (
+          <AutoCaptureCamera
+            onVideoRecorded={handleAutoCaptureVideo}
+            onClose={handleCameraClose}
+          />
+        )}
+      </AnimatePresence>
 
-          {stage === "results" && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon-sm">
-                <Share className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="icon-sm">
-                <Download className="w-4 h-4" />
-              </Button>
+      {/* Header - Hidden during camera mode */}
+      {stage !== "camera" && (
+        <div className="sticky top-14 md:top-0 z-30 bg-background/95 backdrop-blur-lg border-b">
+          <div className="flex items-center justify-between h-14 px-4 max-w-6xl mx-auto">
+            <div className="flex items-center gap-4">
+              {stage !== "upload" && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={stage === "results" ? resetAnalysis : () => setStage("upload")}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              )}
+              <h1 className="font-bold text-lg">
+                {stage === "upload" && "Analyze Swing"}
+                {stage === "options" && "Swing Options"}
+                {stage === "analyzing" && "Analyzing..."}
+                {stage === "results" && "Analysis Results"}
+              </h1>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="px-4 py-6 max-w-6xl mx-auto">
-        <AnimatePresence mode="wait">
-          {/* Upload Stage */}
-          {stage === "upload" && (
-            <motion.div
-              key="upload"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <VideoUpload onVideoSelect={handleVideoSelect} />
-            </motion.div>
-          )}
+            <div className="flex items-center gap-2">
+              {stage === "upload" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setStage("camera");
+                    setIsFullscreenRecorderOpen(true);
+                  }}
+                >
+                  Open Camera
+                </Button>
+              )}
+              {stage === "results" && (
+                <>
+                  <Button variant="outline" size="icon-sm">
+                    <Share className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon-sm">
+                    <Download className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Content - Hidden during camera mode */}
+      {stage !== "camera" && (
+        <div className="px-4 py-6 max-w-6xl mx-auto">
+          <AnimatePresence mode="wait">
+            {/* Upload Stage */}
+            {stage === "upload" && (
+              <motion.div
+                key="upload"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+              >
+                <VideoUpload onVideoSelect={handleVideoSelect} />
+              </motion.div>
+            )}
 
           {/* Options Stage */}
           {stage === "options" && (
@@ -392,8 +442,9 @@ export default function AnalyzePage() {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
-      </div>
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
