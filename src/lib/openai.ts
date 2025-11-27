@@ -224,13 +224,38 @@ export async function analyzeSwingFrames(
   cameraAngle: string = "unknown",
   clubUsed: string = "unknown"
 ) {
-  const imageContent = frames.map((frame) => ({
+  // Validate frames
+  if (!frames || frames.length === 0) {
+    throw new Error("No frames provided for analysis");
+  }
+
+  // Log frame info for debugging
+  console.log(`Analyzing ${frames.length} frames:`);
+  frames.forEach((frame, i) => {
+    const size = frame.length;
+    const isValid = frame.startsWith("data:image");
+    console.log(`  Frame ${i + 1}: ${size} bytes, valid: ${isValid}`);
+  });
+
+  // Validate each frame
+  const validFrames = frames.filter(frame => frame && frame.length > 200 && frame.startsWith("data:"));
+  if (validFrames.length === 0) {
+    throw new Error("No valid frames available for analysis. Frame data may be corrupted.");
+  }
+
+  if (validFrames.length < frames.length) {
+    console.warn(`Warning: Only ${validFrames.length} of ${frames.length} frames are valid`);
+  }
+
+  const imageContent = validFrames.map((frame) => ({
     type: "image_url" as const,
     image_url: {
       url: frame.startsWith("data:") ? frame : `data:image/jpeg;base64,${frame}`,
       detail: "low" as const, // Use low detail for faster processing
     },
   }));
+
+  console.log("Sending request to OpenAI...");
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o", // Best vision model for detailed analysis
@@ -260,9 +285,16 @@ Provide a comprehensive analysis in JSON format.`,
     temperature: 0.5,
   });
 
+  console.log("OpenAI response received:", {
+    hasContent: !!response.choices[0]?.message?.content,
+    finishReason: response.choices[0]?.finish_reason,
+    contentLength: response.choices[0]?.message?.content?.length || 0,
+  });
+
   const content = response.choices[0]?.message?.content;
   if (!content) {
-    throw new Error("No analysis content received from OpenAI");
+    console.error("OpenAI response:", JSON.stringify(response, null, 2));
+    throw new Error("No analysis content received from OpenAI. The API may have rejected the images or timed out.");
   }
 
   try {

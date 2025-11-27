@@ -46,12 +46,24 @@ export function extractVideoFrameAsBase64(
   maxWidth: number = 512
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Validate video dimensions
+    if (!video.videoWidth || !video.videoHeight) {
+      reject(new Error(`Invalid video dimensions: ${video.videoWidth}x${video.videoHeight}`));
+      return;
+    }
+
     const canvas = document.createElement("canvas");
 
     // Scale down to max 512px width for faster processing
     const scale = Math.min(1, maxWidth / video.videoWidth);
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
+
+    // Ensure minimum canvas size
+    if (canvas.width < 10 || canvas.height < 10) {
+      reject(new Error(`Canvas too small: ${canvas.width}x${canvas.height}`));
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -72,6 +84,14 @@ export function extractVideoFrameAsBase64(
       setTimeout(() => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+
+        // Validate the data URL is not empty (minimum valid JPEG is ~200 bytes)
+        if (!dataUrl || dataUrl.length < 200) {
+          reject(new Error(`Frame extraction failed: empty or invalid frame at ${time}s`));
+          return;
+        }
+
+        console.log(`Frame extracted at ${time}s: ${dataUrl.length} bytes`);
         resolve(dataUrl);
       }, 100);
     };

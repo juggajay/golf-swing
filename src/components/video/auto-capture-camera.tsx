@@ -64,15 +64,25 @@ export function AutoCaptureCamera({
   const postImpactTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const poseDetectorRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const captureStateRef = useRef<CaptureState>("initializing");
+  const bufferStartedRef = useRef(false);
 
   const setIsFullscreenRecorderOpen = useAppStore((state) => state.setIsFullscreenRecorderOpen);
+
+  // Helper to update capture state (both state and ref)
+  const updateCaptureState = useCallback((newState: CaptureState) => {
+    captureStateRef.current = newState;
+    setCaptureState(newState);
+  }, []);
 
   // Initialize camera
   const initCamera = useCallback(async (facing: "environment" | "user") => {
     try {
-      setCaptureState("initializing");
+      updateCaptureState("initializing");
       setStatusMessage("Requesting camera access...");
       setError(null);
+      bufferStartedRef.current = false;
+      impactDetectedRef.current = false;
 
       // Stop existing stream
       if (stream) {
@@ -102,14 +112,24 @@ export function AutoCaptureCamera({
         initAudioAnalysis(newStream);
       }
 
-      // Initialize pose detection
-      await initPoseDetection();
+      // Try to initialize pose detection, but don't wait too long
+      const posePromise = initPoseDetection();
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
+      await Promise.race([posePromise, timeoutPromise]);
 
-      setCaptureState("waiting_for_golfer");
-      setStatusMessage("Position yourself in frame");
+      // If pose detection isn't ready, go straight to sound-only mode
+      if (!poseDetectorRef.current) {
+        console.log("Pose detection not available, using sound-only mode");
+        updateCaptureState("ready_to_capture");
+        setStatusMessage("Ready - Swing when ready! (Sound detection)");
+        startBufferRecording(newStream);
+      } else {
+        updateCaptureState("waiting_for_golfer");
+        setStatusMessage("Position yourself in frame");
+      }
 
       // Start the detection loop
-      startDetectionLoop();
+      startDetectionLoop(newStream);
 
     } catch (err: any) {
       console.error("Camera error:", err);
@@ -124,9 +144,9 @@ export function AutoCaptureCamera({
       } else {
         setError("Could not access camera. Please check permissions and try again.");
       }
-      setCaptureState("error");
+      updateCaptureState("error");
     }
-  }, [stream, audioEnabled]);
+  }, [stream, audioEnabled, updateCaptureState]);
 
   // Initialize audio analysis for impact detection
   const initAudioAnalysis = (mediaStream: MediaStream) => {
@@ -236,14 +256,18 @@ export function AutoCaptureCamera({
   };
 
   // Start continuous recording to circular buffer
-  const startBufferRecording = useCallback(() => {
-    if (!stream || isRecordingRef.current) return;
+  const startBufferRecording = useCallback((mediaStream: MediaStream) => {
+    if (bufferStartedRef.current || isRecordingRef.current) {
+      console.log("Buffer already started, skipping");
+      return;
+    }
 
+    console.log("Starting buffer recording...");
     circularBufferRef.current = [];
     isRecordingRef.current = true;
-    impactDetectedRef.current = false;
+    bufferStartedRef.current = true;
 
-    const mediaRecorder = new MediaRecorder(stream, {
+    const mediaRecorder = new MediaRecorder(mediaStream, {
       mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm;codecs=vp9"
         : "video/webm",
@@ -264,10 +288,11 @@ export function AutoCaptureCamera({
     };
 
     mediaRecorder.onstop = () => {
+      console.log("MediaRecorder stopped, impact detected:", impactDetectedRef.current);
       if (impactDetectedRef.current && circularBufferRef.current.length > 0) {
         const blob = new Blob(circularBufferRef.current, { type: "video/webm" });
         setRecordedBlob(blob);
-        setCaptureState("captured");
+        updateCaptureState("captured");
         setStatusMessage("Swing captured!");
 
         if (videoRef.current) {
@@ -280,41 +305,47 @@ export function AutoCaptureCamera({
 
     // Record in 500ms chunks
     mediaRecorder.start(500);
-    console.log("Buffer recording started");
+    console.log("Buffer recording started successfully");
 
-  }, [stream]);
+  }, [updateCaptureState]);
 
   // Handle impact detection
   const handleImpactDetected = useCallback(() => {
     if (impactDetectedRef.current) return;
 
+    console.log("Impact detected!");
     impactDetectedRef.current = true;
-    setCaptureState("recording");
+    updateCaptureState("recording");
     setStatusMessage("Impact detected! Capturing...");
 
     // Continue recording for 2 more seconds after impact
     postImpactTimeoutRef.current = setTimeout(() => {
+      console.log("Post-impact timeout, stopping recorder");
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
         isRecordingRef.current = false;
       }
     }, 2000);
 
-  }, []);
+  }, [updateCaptureState]);
 
   // Main detection loop
-  const startDetectionLoop = useCallback(() => {
+  const startDetectionLoop = useCallback((mediaStream: MediaStream) => {
+    console.log("Starting detection loop");
+
     const detect = async () => {
       if (!videoRef.current || videoRef.current.readyState < 2) {
         animationFrameRef.current = requestAnimationFrame(detect);
         return;
       }
 
+      const currentState = captureStateRef.current;
+
       // Pose detection - only when not already recording or captured
       if (poseDetectorRef.current &&
-          captureState !== "captured" &&
-          captureState !== "recording" &&
-          captureState !== "ready_to_capture") {
+          currentState !== "captured" &&
+          currentState !== "recording" &&
+          currentState !== "ready_to_capture") {
         try {
           const results = poseDetectorRef.current.detectForVideo(
             videoRef.current,
@@ -324,38 +355,47 @@ export function AutoCaptureCamera({
           const poseStatus = analyzePose(results.landmarks);
 
           if (!poseStatus.inFrame) {
-            if (captureState !== "waiting_for_golfer") {
-              setCaptureState("waiting_for_golfer");
+            if (currentState !== "waiting_for_golfer") {
+              updateCaptureState("waiting_for_golfer");
               setStatusMessage("Position yourself in frame");
             }
           } else if (poseStatus.inAddressPosition) {
-            setCaptureState("ready_to_capture");
+            updateCaptureState("ready_to_capture");
             setStatusMessage("Ready - Swing when ready!");
-            startBufferRecording();
+            startBufferRecording(mediaStream);
           } else if (poseStatus.inFrame) {
-            if (captureState === "waiting_for_golfer") {
-              setCaptureState("golfer_detected");
+            if (currentState === "waiting_for_golfer") {
+              updateCaptureState("golfer_detected");
               setStatusMessage("Get into address position");
             }
           }
         } catch (err) {
-          // Pose detection failed, continue with sound-only
+          // Pose detection failed, continue with sound-only mode
+          console.log("Pose detection error, switching to sound-only");
+          if (!bufferStartedRef.current) {
+            updateCaptureState("ready_to_capture");
+            setStatusMessage("Ready - Swing when ready! (Sound detection)");
+            startBufferRecording(mediaStream);
+          }
         }
       }
 
       // Sound detection (when in ready state)
-      if ((captureState === "ready_to_capture" || captureState === "recording") &&
+      if ((currentState === "ready_to_capture" || currentState === "recording") &&
           !impactDetectedRef.current) {
         if (detectImpact()) {
           handleImpactDetected();
         }
       }
 
-      animationFrameRef.current = requestAnimationFrame(detect);
+      // Continue loop if not captured
+      if (currentState !== "captured") {
+        animationFrameRef.current = requestAnimationFrame(detect);
+      }
     };
 
     detect();
-  }, [captureState, startBufferRecording, handleImpactDetected]);
+  }, [updateCaptureState, startBufferRecording, handleImpactDetected]);
 
   // Initialize on mount
   useEffect(() => {
@@ -399,7 +439,8 @@ export function AutoCaptureCamera({
   const reRecord = () => {
     setRecordedBlob(null);
     impactDetectedRef.current = false;
-    setCaptureState("waiting_for_golfer");
+    bufferStartedRef.current = false;
+    isRecordingRef.current = false;
     initCamera(facingMode);
   };
 
