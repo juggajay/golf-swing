@@ -71,13 +71,15 @@ export function AutoCaptureCamera({
   const initCamera = useCallback(async (facing: "environment" | "user") => {
     try {
       setCaptureState("initializing");
-      setStatusMessage("Starting camera...");
+      setStatusMessage("Requesting camera access...");
+      setError(null);
 
       // Stop existing stream
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
 
+      // Request permissions - this will show the browser's permission dialog
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: facing,
@@ -93,6 +95,8 @@ export function AutoCaptureCamera({
         await videoRef.current.play();
       }
 
+      setStatusMessage("Camera ready, initializing...");
+
       // Initialize audio analysis if audio is enabled
       if (audioEnabled) {
         initAudioAnalysis(newStream);
@@ -103,14 +107,23 @@ export function AutoCaptureCamera({
 
       setCaptureState("waiting_for_golfer");
       setStatusMessage("Position yourself in frame");
-      setError(null);
 
       // Start the detection loop
       startDetectionLoop();
 
     } catch (err: any) {
       console.error("Camera error:", err);
-      setError("Could not access camera. Please check permissions.");
+
+      // Provide more specific error messages
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setError("Camera permission denied. Please allow camera access and try again.");
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        setError("No camera found. Please connect a camera and try again.");
+      } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+        setError("Camera is in use by another app. Please close other apps using the camera.");
+      } else {
+        setError("Could not access camera. Please check permissions and try again.");
+      }
       setCaptureState("error");
     }
   }, [stream, audioEnabled]);
@@ -480,10 +493,35 @@ export function AutoCaptureCamera({
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="absolute top-32 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-500/90 rounded-xl text-white">
-          {error}
+      {/* Error State - Full screen overlay with retry */}
+      {captureState === "error" && error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-6">
+          <div className="max-w-sm text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+              <X className="w-10 h-10 text-red-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white mb-2">Camera Access Required</h3>
+              <p className="text-white/70">{error}</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                size="lg"
+                onClick={() => initCamera(facingMode)}
+                className="w-full"
+              >
+                Try Again
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={onClose}
+                className="w-full"
+              >
+                Upload Video Instead
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
