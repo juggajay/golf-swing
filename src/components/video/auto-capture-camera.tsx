@@ -89,6 +89,23 @@ export function AutoCaptureCamera({
         stream.getTracks().forEach((track) => track.stop());
       }
 
+      // Check if permissions are already denied (browser cached state)
+      try {
+        const cameraPermission = await navigator.permissions.query({ name: "camera" as PermissionName });
+        const micPermission = await navigator.permissions.query({ name: "microphone" as PermissionName });
+
+        console.log("Permission state - camera:", cameraPermission.state, "mic:", micPermission.state);
+
+        if (cameraPermission.state === "denied") {
+          setError("Camera permission was previously denied. Please reset permissions in your browser settings.");
+          updateCaptureState("error");
+          return;
+        }
+      } catch (permErr) {
+        // permissions.query not supported in all browsers, continue anyway
+        console.log("Permission query not supported, continuing...");
+      }
+
       // Request permissions - this will show the browser's permission dialog
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -536,24 +553,45 @@ export function AutoCaptureCamera({
 
       {/* Error State - Full screen overlay with retry */}
       {captureState === "error" && error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-6">
-          <div className="max-w-sm text-center space-y-6">
-            <div className="w-20 h-20 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
-              <X className="w-10 h-10 text-red-500" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-6 overflow-y-auto">
+          <div className="max-w-sm text-center space-y-4 my-auto">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+              <X className="w-8 h-8 text-red-500" />
             </div>
             <div>
               <h3 className="text-xl font-bold text-white mb-2">Camera Access Required</h3>
-              <p className="text-white/70 mb-4">{error}</p>
-              <div className="text-left text-xs text-white/50 bg-white/10 rounded-lg p-3 space-y-2">
-                <p className="font-semibold text-white/70">To enable camera access:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Click the camera/lock icon in your browser&apos;s address bar</li>
-                  <li>Set Camera and Microphone to &quot;Allow&quot;</li>
-                  <li>Refresh the page or tap &quot;Try Again&quot;</li>
-                </ul>
+              <p className="text-white/70 mb-4 text-sm">{error}</p>
+
+              <div className="text-left text-xs bg-white/10 rounded-lg p-3 space-y-3">
+                <div>
+                  <p className="font-semibold text-white/90 mb-1">Chrome / Edge:</p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-white/60">
+                    <li>Click the lock/tune icon in the address bar</li>
+                    <li>Click &quot;Site settings&quot;</li>
+                    <li>Set Camera and Microphone to &quot;Allow&quot;</li>
+                    <li>Refresh the page</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-white/90 mb-1">Safari (iOS):</p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-white/60">
+                    <li>Go to Settings → Safari → Camera</li>
+                    <li>Set to &quot;Allow&quot; or &quot;Ask&quot;</li>
+                    <li>Return here and tap &quot;Try Again&quot;</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-white/90 mb-1">Safari (Mac):</p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-white/60">
+                    <li>Safari menu → Settings → Websites</li>
+                    <li>Click Camera, find this site, set to &quot;Allow&quot;</li>
+                  </ul>
+                </div>
               </div>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 pt-2">
               <Button
                 size="lg"
                 onClick={() => initCamera(facingMode)}
