@@ -75,8 +75,8 @@ export function AutoCaptureCamera({
     setCaptureState(newState);
   }, []);
 
-  // Initialize camera
-  const initCamera = useCallback(async (facing: "environment" | "user") => {
+  // Initialize camera - simplified version similar to working fullscreen-recorder
+  const initCamera = async (facing: "environment" | "user") => {
     try {
       updateCaptureState("initializing");
       setStatusMessage("Requesting camera access...");
@@ -90,27 +90,24 @@ export function AutoCaptureCamera({
         streamRef.current = null;
       }
 
-      console.log("Requesting camera with facingMode:", facing);
-
-      // Request permissions - this will show the browser's permission dialog
+      // Request camera + audio permissions
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: facing,
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },
-        audio: true, // Always request audio for impact detection
+        audio: true,
       });
-
-      console.log("Camera stream obtained:", newStream.getTracks().map(t => t.kind));
 
       streamRef.current = newStream;
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
-        await videoRef.current.play();
+        videoRef.current.play();
       }
 
       setStatusMessage("Camera ready, initializing...");
+      setError(null);
 
       // Initialize audio analysis
       initAudioAnalysis(newStream);
@@ -135,7 +132,7 @@ export function AutoCaptureCamera({
       startDetectionLoop(newStream);
 
     } catch (err: any) {
-      console.error("Camera error:", err.name, err.message);
+      console.error("Camera error:", err);
 
       // Provide more specific error messages
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
@@ -145,12 +142,11 @@ export function AutoCaptureCamera({
       } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
         setError("Camera is in use by another app. Please close other apps using the camera.");
       } else {
-        setError(`Could not access camera: ${err.message}`);
+        setError("Could not access camera. Please check permissions.");
       }
       updateCaptureState("error");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [updateCaptureState]);
+  };
 
   // Initialize audio analysis for impact detection
   const initAudioAnalysis = (mediaStream: MediaStream) => {
