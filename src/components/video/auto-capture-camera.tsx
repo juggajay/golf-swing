@@ -44,7 +44,6 @@ export function AutoCaptureCamera({
   const [captureState, setCaptureState] = useState<CaptureState>("initializing");
   const [statusMessage, setStatusMessage] = useState("Initializing camera...");
   const [error, setError] = useState<string | null>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [soundLevel, setSoundLevel] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -54,6 +53,7 @@ export function AutoCaptureCamera({
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -85,26 +85,12 @@ export function AutoCaptureCamera({
       impactDetectedRef.current = false;
 
       // Stop existing stream
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
 
-      // Check if permissions are already denied (browser cached state)
-      try {
-        const cameraPermission = await navigator.permissions.query({ name: "camera" as PermissionName });
-        const micPermission = await navigator.permissions.query({ name: "microphone" as PermissionName });
-
-        console.log("Permission state - camera:", cameraPermission.state, "mic:", micPermission.state);
-
-        if (cameraPermission.state === "denied") {
-          setError("Camera permission was previously denied. Please reset permissions in your browser settings.");
-          updateCaptureState("error");
-          return;
-        }
-      } catch (permErr) {
-        // permissions.query not supported in all browsers, continue anyway
-        console.log("Permission query not supported, continuing...");
-      }
+      console.log("Requesting camera with facingMode:", facing);
 
       // Request permissions - this will show the browser's permission dialog
       const newStream = await navigator.mediaDevices.getUserMedia({
@@ -113,10 +99,12 @@ export function AutoCaptureCamera({
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },
-        audio: audioEnabled,
+        audio: true, // Always request audio for impact detection
       });
 
-      setStream(newStream);
+      console.log("Camera stream obtained:", newStream.getTracks().map(t => t.kind));
+
+      streamRef.current = newStream;
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
         await videoRef.current.play();
@@ -124,10 +112,8 @@ export function AutoCaptureCamera({
 
       setStatusMessage("Camera ready, initializing...");
 
-      // Initialize audio analysis if audio is enabled
-      if (audioEnabled) {
-        initAudioAnalysis(newStream);
-      }
+      // Initialize audio analysis
+      initAudioAnalysis(newStream);
 
       // Try to initialize pose detection, but don't wait too long
       const posePromise = initPoseDetection();
@@ -149,7 +135,7 @@ export function AutoCaptureCamera({
       startDetectionLoop(newStream);
 
     } catch (err: any) {
-      console.error("Camera error:", err);
+      console.error("Camera error:", err.name, err.message);
 
       // Provide more specific error messages
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
@@ -159,11 +145,12 @@ export function AutoCaptureCamera({
       } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
         setError("Camera is in use by another app. Please close other apps using the camera.");
       } else {
-        setError("Could not access camera. Please check permissions and try again.");
+        setError(`Could not access camera: ${err.message}`);
       }
       updateCaptureState("error");
     }
-  }, [stream, audioEnabled, updateCaptureState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateCaptureState]);
 
   // Initialize audio analysis for impact detection
   const initAudioAnalysis = (mediaStream: MediaStream) => {
@@ -422,8 +409,8 @@ export function AutoCaptureCamera({
     return () => {
       setIsFullscreenRecorderOpen(false);
 
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
