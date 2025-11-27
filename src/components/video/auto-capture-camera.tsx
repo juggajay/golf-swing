@@ -502,7 +502,15 @@ export function AutoCaptureCamera({
             </div>
             <div>
               <h3 className="text-xl font-bold text-white mb-2">Camera Access Required</h3>
-              <p className="text-white/70">{error}</p>
+              <p className="text-white/70 mb-4">{error}</p>
+              <div className="text-left text-xs text-white/50 bg-white/10 rounded-lg p-3 space-y-2">
+                <p className="font-semibold text-white/70">To enable camera access:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Click the camera/lock icon in your browser&apos;s address bar</li>
+                  <li>Set Camera and Microphone to &quot;Allow&quot;</li>
+                  <li>Refresh the page or tap &quot;Try Again&quot;</li>
+                </ul>
+              </div>
             </div>
             <div className="flex flex-col gap-3">
               <Button
